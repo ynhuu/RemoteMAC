@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#080d18" />
+    <title>RemoteMAC · 动态编码场景</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+        color: #edf4ff;
+        background: #080d18;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        min-width: 320px;
+        margin: 0;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+
+      body { background: #080d18; }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .panel {
+        position: fixed;
+        z-index: 2;
+        top: max(18px, env(safe-area-inset-top));
+        right: max(18px, env(safe-area-inset-right));
+        width: min(300px, calc(100vw - 36px));
+        padding: 16px;
+        border: 1px solid rgba(183, 206, 241, .16);
+        border-radius: 18px;
+        background: linear-gradient(145deg, rgba(16, 26, 44, .88), rgba(9, 16, 29, .78));
+        box-shadow: 0 24px 70px rgba(0, 0, 0, .28), inset 0 1px rgba(255, 255, 255, .07);
+        backdrop-filter: blur(24px) saturate(1.25);
+        -webkit-backdrop-filter: blur(24px) saturate(1.25);
+        transition: opacity .18s ease, transform .18s ease;
+      }
+
+      .panel::before {
+        position: absolute;
+        top: -1px;
+        left: 24px;
+        width: 74px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #81baff, transparent);
+        content: "";
+      }
+
+      .panel.hidden {
+        opacity: 0;
+        transform: translateY(-7px);
+        pointer-events: none;
+      }
+
+      .heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+      .mark {
+        display: grid;
+        flex: none;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid rgba(131, 180, 255, .32);
+        border-radius: 11px;
+        background: linear-gradient(145deg, rgba(68, 131, 222, .42), rgba(16, 31, 55, .58));
+        box-shadow: inset 0 1px rgba(255, 255, 255, .13), 0 8px 22px rgba(30, 85, 160, .16);
+        color: #dceaff;
+        font-size: 17px;
+      }
+
+      .mark svg { width: 19px; height: 19px; }
+
+      .brand-copy { display: grid; gap: 2px; min-width: 0; }
+      .brand-copy strong { font-size: 12px; font-weight: 650; letter-spacing: .02em; }
+      .brand-copy span { color: #91a2bd; font-size: 10px; }
+
+      .live {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex: none;
+        padding: 6px 8px;
+        border: 1px solid rgba(95, 224, 178, .18);
+        border-radius: 999px;
+        background: rgba(38, 119, 95, .14);
+        color: #a1ebd0;
+        font-size: 10px;
+        letter-spacing: .06em;
+      }
+
+      .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #62e4b4; box-shadow: 0 0 10px #62e4b477; }
+      .paused .live { border-color: rgba(246, 188, 103, .2); background: rgba(128, 83, 25, .16); color: #f4ce91; }
+      .paused .live-dot { background: #ffc56c; box-shadow: 0 0 9px #ffc56c66; }
+
+      h1 { margin: 15px 0 0; font-size: 19px; font-weight: 620; letter-spacing: -.035em; }
+      .subtitle { margin: 5px 0 0; color: #94a5bd; font-size: 11px; line-height: 1.55; }
+
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+        margin-top: 14px;
+      }
+
+      .stat {
+        min-width: 0;
+        padding: 9px 10px;
+        border: 1px solid rgba(194, 213, 240, .085);
+        border-radius: 11px;
+        background: linear-gradient(145deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .018));
+      }
+
+      .label { display: block; color: #8293ad; font-size: 10px; }
+      .value { display: block; margin-top: 4px; overflow: hidden; color: #eaf2ff; font-size: 16px; font-variant-numeric: tabular-nums; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
+
+      .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 11px; }
+
+      button, select {
+        min-width: 0;
+        min-height: 36px;
+        padding: 0 9px;
+        border: 1px solid rgba(197, 216, 242, .14);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, .045);
+        color: #e7effd;
+        font: inherit;
+        font-size: 11px;
+      }
+
+      button { cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+      button:hover, select:hover { background-color: rgba(255, 255, 255, .1); border-color: rgba(197, 216, 242, .26); }
+      button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #85b7ff; outline-offset: 2px; }
+      button.primary { border-color: rgba(93, 151, 239, .42); background: linear-gradient(110deg, rgba(49, 105, 196, .62), rgba(45, 81, 143, .58)); }
+      button.primary:hover { background: linear-gradient(110deg, rgba(65, 127, 222, .76), rgba(52, 96, 164, .72)); }
+
+      .speed {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) 35px;
+        align-items: center;
+        gap: 9px;
+        padding: 3px 2px 0;
+        color: #9caec7;
+        font-size: 10px;
+      }
+
+      .speed output { color: #d6e5fb; text-align: right; font-variant-numeric: tabular-nums; }
+      input[type="range"] { width: 100%; margin: 0; accent-color: #80b4ff; }
+
+      .hint { margin: 11px 2px 0; color: #7f91aa; font-size: 10px; line-height: 1.5; }
+
+      .scene-label {
+        position: fixed;
+        z-index: 1;
+        top: max(22px, env(safe-area-inset-top));
+        left: max(25px, env(safe-area-inset-left));
+        display: grid;
+        gap: 5px;
+        color: rgba(221, 233, 251, .82);
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+      }
+
+      .scene-label strong { font-size: 10px; font-weight: 600; letter-spacing: .18em; }
+      .scene-label span { color: #8194b1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; letter-spacing: .1em; }
+
+      .corner {
+        position: fixed;
+        z-index: 1;
+        bottom: max(17px, env(safe-area-inset-bottom));
+        left: max(19px, env(safe-area-inset-left));
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: rgba(222, 234, 252, .76);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 9px;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: .07em;
+        text-shadow: 0 1px 8px #000;
+        pointer-events: none;
+      }
+
+      .corner-line { width: 20px; height: 1px; background: #75b9ff; box-shadow: 0 0 8px #75b9ff88; }
+
+      @media (max-width: 520px) {
+        .panel { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); width: min(286px, calc(100vw - 20px)); padding: 13px; }
+        .scene-label { top: auto; bottom: max(40px, calc(env(safe-area-inset-bottom) + 34px)); left: max(14px, env(safe-area-inset-left)); }
+        h1 { margin-top: 12px; font-size: 16px; }
+        .stats { gap: 6px; margin-top: 11px; }
+        .stat { padding: 8px 9px; }
+        .value { font-size: 14px; }
+        .controls { gap: 6px; margin-top: 9px; }
+        button, select { min-height: 35px; padding-inline: 8px; font-size: 10px; }
+        .hint { margin-top: 9px; }
+      }
+
+      @media (max-height: 560px) and (min-width: 521px) {
+        .panel { top: 10px; width: 278px; padding: 12px; }
+        h1 { margin-top: 9px; font-size: 16px; }
+        .subtitle, .hint { display: none; }
+        .stats { margin-top: 9px; }
+        .controls { margin-top: 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="motion" aria-label="RemoteMAC 动态编码测试画面"></canvas>
+
+    <section class="panel" id="panel" aria-label="动态编码场景控制">
+      <header class="heading">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="3" width="15" height="10.5" rx="2.2" stroke="currentColor" stroke-width="1.2"/><path d="M7 17h6M10 13.8V17M6 7.2h8M6 9.5h4" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg></span>
+          <span class="brand-copy"><strong>RemoteMAC</strong><span>浏览器动态画面源</span></span>
+        </div>
+        <span class="live" id="live"><i class="live-dot"></i><span id="stateText">LIVE</span></span>
+      </header>
+
+      <h1>动态编码场景</h1>
+      <p class="subtitle">柔和流动 · 稳定帧率 · 持续变化</p>
+
+      <div class="stats" aria-live="polite">
+        <div class="stat"><span class="label">当前帧率</span><strong class="value" id="fps">-- FPS</strong></div>
+        <div class="stat"><span class="label">帧序号</span><strong class="value" id="frame">000000</strong></div>
+        <div class="stat"><span class="label">运行时长</span><strong class="value" id="elapsed">0:00</strong></div>
+        <div class="stat"><span class="label">场景细节</span><strong class="value" id="detailLabel">高细节</strong></div>
+      </div>
+
+      <div class="controls">
+        <button class="primary" id="toggle" type="button">暂停画面</button>
+        <select id="targetFps" aria-label="目标帧率">
+          <option value="30" selected>目标 30 FPS</option>
+          <option value="60">目标 60 FPS</option>
+        </select>
+        <select id="detail" aria-label="场景细节">
+          <option value="high">高细节</option>
+          <option value="balanced">平衡细节</option>
+        </select>
+        <button id="fullscreen" type="button">进入全屏</button>
+        <label class="speed"><span>运动速度</span><input id="speed" type="range" min="0.5" max="2" step="0.1" value="1" /><output id="speedValue" for="speed">1.0×</output></label>
+      </div>
+
+      <p class="hint">H 隐藏或显示控制面板 · 空格暂停或继续</p>
+    </section>
+
+    <div class="scene-label" aria-hidden="true"><strong>REMOTE SESSION</strong><span>LOCAL MOTION SOURCE · 01</span></div>
+    <div class="corner" id="corner"><span class="corner-line"></span><span>FRAME 000000</span><span>·</span><span>30 FPS</span></div>
+
+    <script>
+      (() => {
+        const canvas = document.getElementById("motion");
+        const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+        const panel = document.getElementById("panel");
+        const stateText = document.getElementById("stateText");
+        const fpsText = document.getElementById("fps");
+        const frameText = document.getElementById("frame");
+        const elapsedText = document.getElementById("elapsed");
+        const detailLabel = document.getElementById("detailLabel");
+        const corner = document.getElementById("corner");
+        const toggleButton = document.getElementById("toggle");
+        const fullscreenButton = document.getElementById("fullscreen");
+        const speedInput = document.getElementById("speed");
+        const speedValue = document.getElementById("speedValue");
+        const detailInput = document.getElementById("detail");
+        const targetFpsInput = document.getElementById("targetFps");
+
+        const TAU = Math.PI * 2;
+        let width = 0;
+        let height = 0;
+        let pixelRatio = 1;
+        let running = true;
+        let speed = 1;
+        let targetFps = 30;
+        let detail = "high";
+        let frame = 0;
+        let sceneTime = 0;
+        let elapsedBeforePause = 0;
+        let runStartedAt = performance.now();
+        let lastMotionAt = runStartedAt;
+        let previousDrawAt = 0;
+        let fpsWindowAt = runStartedAt;
+        let fpsFrames = 0;
+        let actualFps = 0;
+
+        function resize() {
+          width = window.innerWidth;
+          height = window.innerHeight;
+          pixelRatio = Math.min(window.devicePixelRatio || 1, 1.75);
+          canvas.width = Math.max(1, Math.round(width * pixelRatio));
+          canvas.height = Math.max(1, Math.round(height * pixelRatio));
+          ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        }
+
+        function drawBackground(t) {
+          const bg = ctx.createLinearGradient(0, 0, width, height);
+          bg.addColorStop(0, "#091321");
+          bg.addColorStop(.52, "#0b1423");
+          bg.addColorStop(1, "#111827");
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, width, height);
+
+          const span = Math.max(width, height);
+          const glowX = width * (.34 + Math.sin(t * .12) * .12);
+          const glowY = height * (.39 + Math.cos(t * .1) * .06);
+          const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, span * .7);
+          glow.addColorStop(0, "rgba(49, 91, 150, .17)");
+          glow.addColorStop(.55, "rgba(35, 67, 112, .065)");
+          glow.addColorStop(1, "rgba(8, 13, 24, 0)");
+          ctx.fillStyle = glow;
+          ctx.fillRect(0, 0, width, height);
+
+          if (detail === "high") {
+            const accentX = width * (.74 + Math.cos(t * .1) * .1);
+            const accentY = height * (.67 + Math.sin(t * .085) * .07);
+            const accent = ctx.createRadialGradient(accentX, accentY, 0, accentX, accentY, span * .52);
+            accent.addColorStop(0, "rgba(102, 70, 143, .105)");
+            accent.addColorStop(.58, "rgba(64, 53, 106, .045)");
+            accent.addColorStop(1, "rgba(8, 13, 24, 0)");
+            ctx.fillStyle = accent;
+            ctx.fillRect(0, 0, width, height);
+          }
+
+          const vignette = ctx.createRadialGradient(width * .45, height * .48, span * .18, width * .45, height * .48, span * .82);
+          vignette.addColorStop(0, "rgba(3, 7, 13, 0)");
+          vignette.addColorStop(.72, "rgba(3, 7, 13, .04)");
+          vignette.addColorStop(1, "rgba(3, 7, 13, .4)");
+          ctx.fillStyle = vignette;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        function drawOrbit(t) {
+          const cx = width * .5;
+          const cy = height * .5;
+          const radius = Math.min(width, height) * .19;
+          const centerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius * 1.9);
+          centerGlow.addColorStop(0, "rgba(54, 119, 178, .12)");
+          centerGlow.addColorStop(.62, "rgba(44, 94, 143, .055)");
+          centerGlow.addColorStop(1, "rgba(35, 74, 115, 0)");
+          ctx.fillStyle = centerGlow;
+          ctx.fillRect(cx - radius * 2, cy - radius * 2, radius * 4, radius * 4);
+
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(t * .28);
+          ctx.lineWidth = 2;
+          for (let ring = 0; ring < 6; ring++) {
+            ctx.beginPath();
+            const ringRadius = radius * (.42 + ring * .13);
+            ctx.ellipse(0, 0, ringRadius, ringRadius, ring * .2, 0, TAU);
+            ctx.strokeStyle = `hsla(${(218 + ring * 27) % 360}, 70%, 78%, .42)`;
+            ctx.stroke();
+          }
+          ctx.restore();
+
+          const elapsed = elapsedBeforePause + (running ? (performance.now() - runStartedAt) / 1000 : 0);
+          const elapsedLabel = `${elapsed.toFixed(1)} 秒`;
+          const frameLabel = String(frame).padStart(6, "0");
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "rgba(235, 244, 255, .9)";
+          ctx.font = "600 22px -apple-system, BlinkMacSystemFont, sans-serif";
+          ctx.fillText("REMOTE DESKTOP · MOTION", cx, cy - 14);
+          ctx.fillStyle = "rgba(196, 215, 239, .78)";
+          ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, monospace";
+          ctx.fillText(`FRAME ${frameLabel}     ${actualFps || targetFps} FPS     ${elapsedLabel}`, cx, cy + 16);
+        }
+
+        function formatTime(seconds) {
+          const total = Math.floor(seconds);
+          const minutes = Math.floor(total / 60);
+          return `${minutes}:${String(total % 60).padStart(2, "0")}`;
+        }
+
+        function updateReadout(now) {
+          if (now - fpsWindowAt >= 1000) {
+            actualFps = Math.round(fpsFrames * 1000 / (now - fpsWindowAt));
+            fpsFrames = 0;
+            fpsWindowAt = now;
+            fpsText.textContent = `${actualFps} FPS`;
+            frameText.textContent = frame.toLocaleString("en-US");
+            corner.children[1].textContent = `FRAME ${String(frame).padStart(6, "0")}`;
+            const elapsed = elapsedBeforePause + (running ? (now - runStartedAt) / 1000 : 0);
+            elapsedText.textContent = formatTime(elapsed);
+            corner.lastElementChild.textContent = `${actualFps} FPS`;
+          }
+        }
+
+        function draw(now) {
+          if (!running) return;
+          const interval = 1000 / targetFps;
+          if (now - previousDrawAt < interval - 1) {
+            requestAnimationFrame(draw);
+            return;
+          }
+
+          sceneTime += Math.max(0, now - lastMotionAt) / 1000 * speed;
+          lastMotionAt = now;
+          drawBackground(sceneTime);
+          drawOrbit(sceneTime);
+
+          frame++;
+          fpsFrames++;
+          previousDrawAt = now;
+          updateReadout(now);
+          requestAnimationFrame(draw);
+        }
+
+        function start() {
+          if (running) return;
+          running = true;
+          runStartedAt = performance.now();
+          lastMotionAt = runStartedAt;
+          previousDrawAt = 0;
+          fpsWindowAt = runStartedAt;
+          fpsFrames = 0;
+          panel.classList.remove("paused");
+          stateText.textContent = "LIVE";
+          toggleButton.textContent = "暂停画面";
+          requestAnimationFrame(draw);
+        }
+
+        function pause() {
+          if (!running) return;
+          const now = performance.now();
+          running = false;
+          elapsedBeforePause += (now - runStartedAt) / 1000;
+          elapsedText.textContent = formatTime(elapsedBeforePause);
+          panel.classList.add("paused");
+          stateText.textContent = "PAUSED";
+          toggleButton.textContent = "继续画面";
+        }
+
+        toggleButton.addEventListener("click", () => running ? pause() : start());
+        fullscreenButton.addEventListener("click", async () => {
+          if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.();
+          else await document.exitFullscreen?.();
+          fullscreenButton.textContent = document.fullscreenElement ? "退出全屏" : "进入全屏";
+        });
+        speedInput.addEventListener("input", () => {
+          const now = performance.now();
+          if (running) {
+            sceneTime += Math.max(0, now - lastMotionAt) / 1000 * speed;
+            lastMotionAt = now;
+          }
+          speed = Number(speedInput.value);
+          speedValue.value = `${speed.toFixed(1)}×`;
+        });
+        detailInput.addEventListener("change", () => {
+          detail = detailInput.value;
+          detailLabel.textContent = detail === "high" ? "高细节" : "平衡细节";
+        });
+        targetFpsInput.addEventListener("change", () => {
+          targetFps = Number(targetFpsInput.value);
+          previousDrawAt = 0;
+          corner.lastElementChild.textContent = `${targetFps} FPS`;
+        });
+        document.addEventListener("keydown", (event) => {
+          const target = event.target;
+          const typing = target instanceof HTMLElement && (target.isContentEditable || /INPUT|SELECT|TEXTAREA|BUTTON/.test(target.tagName));
+          if (typing || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+          if (event.key.toLowerCase() === "h") panel.classList.toggle("hidden");
+          if (event.code === "Space") {
+            event.preventDefault();
+            running ? pause() : start();
+          }
+        });
+        document.addEventListener("fullscreenchange", () => {
+          fullscreenButton.textContent = document.fullscreenElement ? "退出全屏" : "进入全屏";
+        });
+        window.addEventListener("resize", resize, { passive: true });
+        document.addEventListener("visibilitychange", () => {
+          const now = performance.now();
+          previousDrawAt = 0;
+          lastMotionAt = now;
+          fpsWindowAt = now;
+          fpsFrames = 0;
+        });
+
+        resize();
+        requestAnimationFrame(draw);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "RemoteMAC · 远程桌面",
+  "short_name": "RemoteMAC",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05080f",
+  "theme_color": "#070b14",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png?v=4",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
